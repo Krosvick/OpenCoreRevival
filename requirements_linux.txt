@@ -27,7 +27,7 @@ dnspython==2.4.2
 docutils==0.20.1
 es-core-news-sm @ https://github.com/explosion/spacy-models/releases/download/es_core_news_sm-3.7.0/es_core_news_sm-3.7.0-py3-none-any.whl#sha256=61e6e5530941f5880166855f09f60d7e6ba79ec1e8e45f96244bdb1eb169eb1d
 filelock==3.13.1
-flatbuffers==23.5.26
+flatbuffers>=23.5.26
 fsspec==2023.12.2
 ftfy==6.1.3
 gast==0.5.4
@@ -55,7 +55,7 @@ markdown-it-py==3.0.0
 MarkupSafe==2.1.3
 mccabe==0.7.0
 mdurl==0.1.2
-ml-dtypes==0.5.0
+ml-dtypes==0.2.0
 more-itertools==10.1.0
 murmurhash==1.0.10
 nh3==0.2.15
@@ -106,9 +106,9 @@ sqlparse==0.2.4
 srsly==2.4.8
 tensorboard==2.15.1
 tensorboard-data-server==0.7.2
-tensorflow==2.16.0
-tensorflow-estimator==2.16.0
-tensorflow-intel==2.12.0
+tensorflow>=2.15.0
+tensorflow-estimator>=2.15.0
+tensorflow-cpu>=2.11.0
 tensorflow-io-gcs-filesystem==0.34.0
 termcolor==2.4.0
 thinc==8.1.12

@@ -28,7 +28,9 @@ class Command(BaseCommand):
                 data = json.load(file)
             news_items = []
             for item in data:
-                if item["link"] not in previous_news_uris:
+                # Check if item has all required fields and they are not empty
+                required_fields = ['image_url', 'title', 'content', 'link']
+                if all(key in item and item[key] for key in required_fields) and item["link"] not in previous_news_uris:
                     date_published_str = item["date"]
                     date_published = timezone.make_aware(
                         timezone.datetime.strptime(
