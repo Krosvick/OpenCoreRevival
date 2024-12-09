@@ -1,4 +1,7 @@
 from datetime import timedelta, datetime
+from django.utils import timezone
+import logging
+from urllib.parse import urlparse
 
 from decouple import config
 from django.core.cache import cache
@@ -7,87 +10,233 @@ from django.shortcuts import render
 from django.views.decorators.cache import cache_page
 from pymongo import MongoClient
 from pymongo.server_api import ServerApi
+from django.http import HttpResponse, JsonResponse
+
+# Get logger for this module specifically
+logger = logging.getLogger('news.views')
 
 
 def get_db_client():
     """
-    Retrieves the 'news_news' collection from the 'opencoredatabase' database.
-
-    Returns:
-        pymongo.collection.Collection: The 'news_news' collection.
+    Retrieves the MongoDB client connection.
     """
-    client = MongoClient(config("MONGO_URI"), server_api=ServerApi("1"))
-    return client
+    try:
+        logger.debug("Attempting to connect to MongoDB with URI: %s", config("MONGO_URI", default="<not-set>"))
+        client = MongoClient(config("MONGO_URI"), server_api=ServerApi("1"))
+        
+        # Test the connection with timeout
+        client.admin.command('ping', maxTimeMS=5000)
+        logger.info("Successfully connected to MongoDB")
+        
+        # Log available databases
+        databases = client.list_database_names()
+        logger.debug(f"Available databases: {databases}")
+        
+        return client
+    except Exception as e:
+        logger.error(f"Failed to connect to MongoDB: {str(e)}", exc_info=True)
+        return None
+
+
+def get_website_from_link(link):
+    """Extract website name from link."""
+    try:
+        parsed = urlparse(link)
+        # Remove www. and .cl/.com
+        domain = parsed.netloc.replace('www.', '').split('.')[0]
+        return domain
+    except:
+        return 'default'
 
 
 def get_news(sentiment=None, limit=None):
     """
     Retrieve news articles from the database based on the specified sentiment and limit.
-
-    Args:
-        sentiment (str, optional): The sentiment of the news articles to retrieve. Defaults to None.
-        limit (int, optional): The maximum number of news articles to retrieve. Defaults to None.
-
-    Returns:
-        list: A list of news articles matching the specified sentiment and limit.
     """
-    client = get_db_client()
-    db = client["opencoredatabase"]
-    collection = db["news_news"]
-    two_weeks_ago = datetime.now() - timedelta(weeks=2)
+    client = None
+    try:
+        logger.debug(f"Starting get_news with sentiment={sentiment}, limit={limit}")
+        
+        # Check cache first
+        cache_key = f"news_{sentiment}_{limit}"
+        cached_news = cache.get(cache_key)
+        if cached_news is not None:
+            logger.info(f"Retrieved {len(cached_news)} items from cache for {cache_key}")
+            return cached_news
 
-    query = {"date_published": {"$gte": two_weeks_ago}}
-    if sentiment:
-        query["sentiment"] = sentiment
+        client = get_db_client()
+        if not client:
+            logger.error("Failed to get database client")
+            return []
 
-    news = collection.find(query).sort("date_published", -1)
+        db = client["opencoredatabase"]
+        collection = db["news_news"]
 
-    if limit:
-        news = news.limit(limit)
+        # Build query based only on sentiment and valid image URLs
+        query = {
+            "img_url": {
+                "$exists": True,
+                "$ne": "",
+                "$ne": None,
+                "$regex": "^https?://"  # Ensure URL starts with http:// or https://
+            }
+        }
+        if sentiment:
+            query["sentiment"] = sentiment
 
-    cache_key = f"news_{sentiment}_{limit}"
-    cached_news = cache.get(cache_key)
-    if cached_news is not None:
-        return cached_news
+        # Only retrieve necessary fields
+        projection = {
+            "title": 1,
+            "date_published": 1,
+            "link": 1,
+            "img_url": 1,
+            "website": 1,
+            "sentiment": 1,
+            "_id": 0
+        }
 
-    news = list(news)
-    cache.set(cache_key, news, 3600)
+        # Use limit and batch size for better memory management
+        cursor = collection.find(
+            query, 
+            projection
+        ).sort("date_published", -1).batch_size(100)
+        
+        if limit:
+            cursor = cursor.limit(limit)
 
-    return news
+        # Convert cursor to list with memory consideration
+        news_list = []
+        count = 0
+        max_items = limit if limit else 1000  # Set a reasonable maximum
+        
+        for doc in cursor:
+            if count >= max_items:
+                break
+                
+            # Additional validation of image URL
+            img_url = doc.get('img_url', '')
+            if not img_url or not img_url.startswith(('http://', 'https://')):
+                continue
+                
+            # Process website if needed
+            if not doc.get('website') and doc.get('link'):
+                doc['website'] = get_website_from_link(doc['link'])
+                
+            news_list.append(doc)
+            count += 1
+
+        logger.info(f"Retrieved {len(news_list)} documents from database")
+
+        # Cache results if we have any
+        if news_list:
+            cache.set(cache_key, news_list, 3600)
+            logger.info(f"Cached {len(news_list)} items")
+
+        return news_list
+
+    except Exception as e:
+        logger.error(f"Error in get_news: {str(e)}", exc_info=True)
+        return []
+    finally:
+        if client:
+            client.close()
 
 
-@cache_page(60 * 60)
+@cache_page(60 * 15)
 def home(request):
     """
     Renders the home page with news data.
-
-    Parameters:
-    - request: The HTTP request object.
-
-    Returns:
-    - A rendered HTML template with news data.
     """
-    client = get_db_client()
-    db = client["opencoredatabase"]
-    collection = db["news_news"]
-    latest_news = get_news(limit=5)
-    recent_news = get_news(limit=24)[5:]
-    negative_news = get_news(sentiment="Negativo", limit=20)
-    positive_news = get_news(sentiment="Positivo", limit=20)
+    logger.info("Starting home view request")
+    
+    try:
+        # Get latest news with a small limit
+        latest_news = get_news(limit=5)
+        logger.info(f"Latest news count: {len(latest_news)}")
+        
+        if not latest_news:
+            logger.warning("No latest news available")
+            return render(request, "index.html", {
+                "error_message": "No news articles available at this time.",
+                "latest_news": [],
+                "recent_news": [],
+                "neutral_news": [],
+                "negative_news": [],
+                "positive_news": [],
+                "total_news": 0,
+                "total_words": 0,
+            })
 
-    total_news = collection.count_documents({})
-    total_words = sum(len(news["content"].split()) for news in collection.find({}))
+        # Get other sections with reasonable limits
+        recent_news = get_news(limit=20)
+        logger.info(f"Recent news count: {len(recent_news)}")
+        recent_news = recent_news[5:] if len(recent_news) > 5 else []
+        
+        # Add neutral news section
+        neutral_news = get_news(sentiment="Neutro", limit=10)
+        logger.info(f"Neutral news count: {len(neutral_news) if neutral_news else 0}")
+        
+        negative_news = get_news(sentiment="Negativo", limit=10)
+        logger.info(f"Negative news count: {len(negative_news) if negative_news else 0}")
+        
+        positive_news = get_news(sentiment="Positivo", limit=10)
+        logger.info(f"Positive news count: {len(positive_news) if positive_news else 0}")
 
-    context = {
-        "latest_news": latest_news,
-        "recent_news": recent_news,
-        "negative_news": negative_news,
-        "positive_news": positive_news,
-        "total_news": total_news,
-        "total_words": total_words,
-    }
+        # Get totals more efficiently
+        client = get_db_client()
+        total_news = 0
+        total_words = 0
+        
+        if client:
+            try:
+                db = client["opencoredatabase"]
+                collection = db["news_news"]
+                total_news = collection.count_documents({})
+                
+                # Estimate total words from a sample
+                word_sample = collection.aggregate([
+                    {"$sample": {"size": 100}},
+                    {"$project": {"word_count": {"$size": {"$split": ["$content", " "]}}}},
+                    {"$group": {"_id": None, "avg_words": {"$avg": "$word_count"}}}
+                ])
+                
+                word_sample = list(word_sample)
+                if word_sample:
+                    avg_words = word_sample[0]["avg_words"]
+                    total_words = int(avg_words * total_news)
+                
+                logger.info(f"Totals calculated: {total_news} news, {total_words} words (estimated)")
+            except Exception as e:
+                logger.error(f"Error calculating totals: {str(e)}")
+                total_news = len(latest_news)
+            finally:
+                client.close()
 
-    return render(request, "index.html", context)
+        context = {
+            "latest_news": latest_news,
+            "recent_news": recent_news,
+            "neutral_news": neutral_news,
+            "negative_news": negative_news,
+            "positive_news": positive_news,
+            "total_news": total_news,
+            "total_words": total_words,
+        }
+        
+        logger.info("Rendering home page with complete context")
+        return render(request, "index.html", context)
+
+    except Exception as e:
+        logger.error(f"Error in home view: {str(e)}", exc_info=True)
+        return render(request, "index.html", {
+            "error_message": "Unable to load news at this time. Please try again later.",
+            "latest_news": [],
+            "recent_news": [],
+            "neutral_news": [],
+            "negative_news": [],
+            "positive_news": [],
+            "total_news": 0,
+            "total_words": 0,
+        })
 
 
 def sort_results(request, search_results):
@@ -206,3 +355,42 @@ def search(request):
 
 def stats(request):
     return render(request, "stats.html")
+
+
+def test_logging(request):
+    """Test view to verify logging is working."""
+    logger.debug("This is a debug message")
+    logger.info("This is an info message")
+    logger.warning("This is a warning message")
+    logger.error("This is an error message")
+    return HttpResponse("Logging test complete")
+
+
+def test_db(request):
+    """Test view to verify database connectivity."""
+    try:
+        client = get_db_client()
+        if not client:
+            return JsonResponse({"status": "error", "message": "Could not connect to database"})
+            
+        db = client["opencoredatabase"]
+        collection = db["news_news"]
+        
+        # Get basic stats
+        doc_count = collection.count_documents({})
+        sample_doc = collection.find_one()
+        
+        return JsonResponse({
+            "status": "success",
+            "document_count": doc_count,
+            "sample_document": str(sample_doc) if sample_doc else None,
+            "databases": client.list_database_names()
+        })
+    except Exception as e:
+        return JsonResponse({
+            "status": "error",
+            "message": str(e)
+        })
+    finally:
+        if client:
+            client.close()

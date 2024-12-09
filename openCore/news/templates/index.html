@@ -2,6 +2,13 @@
 {% block news %}
 {% load encode_decode %}
 
+{% if error_message %}
+<div class="alert alert-warning">
+    {{ error_message }}
+</div>
+{% endif %}
+
+{% if latest_news %}
 <div class="hero-grid">
   <div class="latest-news-grid">
     <div class="latest-news-principal">
@@ -32,8 +39,12 @@
           <div class="author-wrapper">
             <div class="circle-avatar">
               <div class="avatar-frame-principal">
-                <img src="{% static 'img/source_logos/' %}{{ latest_news.0.website }}.png"
-                  alt="{{ latest_news.0.website }}">
+                {% if latest_news.0.website %}
+                    <img src="{% static 'img/source_logos/' %}{{ latest_news.0.website }}.png"
+                        alt="{{ latest_news.0.website }}">
+                {% else %}
+                    <img src="{% static 'img/logo.png' %}" alt="Default source">
+                {% endif %}
               </div>
             </div>
           </div>
@@ -71,7 +82,11 @@
         <div class="top-mini">
           <div class="card-avatar">
             <div class="card-avatar-mini">
-              <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+              {% if news.website %}
+                  <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+              {% else %}
+                  <img src="{% static 'img/logo.png' %}" alt="Default source">
+              {% endif %}
             </div>
           </div>
           <div class="card-date-mini">
@@ -125,7 +140,11 @@
             <div class="top-mini">
               <div class="card-avatar">
                 <div class="card-avatar-mini">
-                  <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% if news.website %}
+                      <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Default source">
+                  {% endif %}
                 </div>
               </div>
               <div class="card-date-mini">
@@ -184,6 +203,72 @@
 
 <div class="spacer"></div>
 
+{% if neutral_news %}
+<div class="recent-news-grid">
+  <div class="recent-news-grid2">
+    <div class="heading-h-2">Noticias neutrales</div>
+    <div class="spacer"></div>
+    <div class="subheader">
+      Noticias que presentan una perspectiva equilibrada y objetiva de los acontecimientos políticos.
+    </div>
+    <div class="spacer"></div>
+  </div>
+  <div class="glide" id="glide-neutral">
+    <div class="glide__track" data-glide-el="track">
+      <ul class="glide__slides">
+        {% for news in neutral_news %}
+        <li class="glide__slide">
+          <div class="item">
+            <div class="image-replace">
+              <a href="{{ news.link }}">
+                {% if news.img_url %}
+                <img src="{{ news.img_url }}" alt="{{ news.title }}" class="image-replace" loading="lazy"/>
+                {% else %}
+                <img src="{% static 'img/logo.png' %}" alt="{{ news.title }}" class="image-replace-placeholder" loading="lazy"/>
+                {% endif %}
+              </a>
+              <div class="sentiment-tag {{ news.sentiment|lower }}">
+                <div class="button-text">
+                  {{ news.sentiment }}
+                </div>
+              </div>
+            </div>
+            <div class="heading-h-3">
+              <a href="{{ news.link }}">
+                {{ news.title|truncatechars:60 }}
+              </a>
+            </div>
+            <div class="spacer"></div>
+            <div class="top-mini">
+              <div class="card-avatar">
+                <div class="card-avatar-mini">
+                  {% if news.website %}
+                      <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Default source">
+                  {% endif %}
+                </div>
+              </div>
+              <div class="card-date-mini">
+                {{ news.date_published|date:"j \d\e F, Y" }}
+              </div>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="glide__arrows" data-glide-el="controls">
+      <button class="glide__arrow glide__arrow--left" data-glide-dir="<">&larr;</button>
+      <button class="glide__arrow glide__arrow--right" data-glide-dir=">">&rarr;</button>
+    </div>
+  </div>
+</div>
+</div>
+{% endif %}
+
+<div class="spacer"></div>
+
 <div class="recent-news-grid">
   <div class="recent-news-grid2">
     <div class="heading-h-2">Noticias positivas</div>
@@ -218,7 +303,11 @@
             <div class="top-mini">
               <div class="card-avatar">
                 <div class="card-avatar-mini">
-                  <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% if news.website %}
+                      <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Default source">
+                  {% endif %}
                 </div>
               </div>
               <div class="card-date-mini">
@@ -274,7 +363,11 @@
             <div class="top-mini">
               <div class="card-avatar">
                 <div class="card-avatar-mini">
-                  <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% if news.website %}
+                      <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Default source">
+                  {% endif %}
                 </div>
               </div>
               <div class="card-date-mini">
@@ -333,6 +426,204 @@
   </div>
 </div>
 
+{% else %}
+<div class="hero-grid">
+  <div class="latest-news-grid">
+    <div class="latest-news-principal">
+      <div class="content-principal">
+        <div class="heading-h-2">
+          No hay noticias disponibles en este momento
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if recent_news %}
+<div class="recent-news-grid">
+  <div class="recent-news-grid2">
+    <div class="heading-h-1">Noticias recientes</div>
+    <div class="spacer"></div>
+    <div class="subheader">
+      Enterate de las últimas noticias de la política chilena.
+    </div>
+    <div class="spacer"></div>
+  </div>
+  <div class="glide" id="glide-recent">
+    <div class="glide__track" data-glide-el="track">
+      <ul class="glide__slides">
+        {% for news in recent_news %}
+        <li class="glide__slide">
+          <div class="item">
+            <div class="image-replace">
+              <a href="{{ news.link }}">
+                {% if news.img_url %}
+                <img src="{{ news.img_url }}" alt="{{ news.title }}" class="image-replace" loading="lazy"/>
+                {% else %}
+                <img src="{% static 'img/logo.png' %}" alt="{{ news.title }}" class="image-replace-placeholder" loading="lazy"/>
+                {% endif %}
+              </a>
+              <div class="sentiment-tag {{ news.sentiment|lower }}">
+                <div class="button-text">
+                  {{ news.sentiment }}
+                </div>
+              </div>
+            </div>
+            <div class="heading-h-3">
+              <a href="{{ news.link }}">
+                {{ news.title|truncatechars:60 }}
+              </a>
+            </div>
+            <div class="spacer"></div>
+            <div class="spacer"></div>
+            <div class="top-mini">
+              <div class="card-avatar">
+                <div class="card-avatar-mini">
+                  {% if news.website %}
+                      <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Default source">
+                  {% endif %}
+                </div>
+              </div>
+              <div class="card-date-mini">
+                {{ news.date_published|date:"j \d\e F, Y" }}
+              </div>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="glide__arrows" data-glide-el="controls">
+      <button class="glide__arrow glide__arrow--left" data-glide-dir="<">&larr;</button>
+      <button class="glide__arrow glide__arrow--right" data-glide-dir=">">&rarr;</button>
+    </div>
+  </div>
+</div>
+</div>
+{% endif %}
+
+{% if positive_news %}
+<div class="recent-news-grid">
+  <div class="recent-news-grid2">
+    <div class="heading-h-2">Noticias positivas</div>
+    <div class="spacer"></div>
+  </div>
+  <div class="glide" id="glide-positive">
+    <div class="glide__track" data-glide-el="track">
+      <ul class="glide__slides">
+        {% for news in positive_news %}
+        <li class="glide__slide">
+          <div class="item">
+            <div class="image-replace">
+              <a href="{{ news.link }}">
+                {% if news.img_url %}
+                <img src="{{ news.img_url }}" alt="{{ news.title }}" class="image-replace" loading="lazy"/>
+                {% else %}
+                <img src="{% static 'img/logo.png' %}" alt="{{ news.title }}" class="image-replace-placeholder" loading="lazy"/>
+                {% endif %}
+              </a>
+              <div class="sentiment-tag {{ news.sentiment|lower }}">
+                <div class="button-text">
+                  {{ news.sentiment }}
+                </div>
+              </div>
+            </div>
+            <div class="heading-h-3">
+              <a href="{{ news.link }}">
+                {{ news.title|truncatechars:60 }}
+              </a>
+            </div>
+            <div class="spacer"></div>
+            <div class="top-mini">
+              <div class="card-avatar">
+                <div class="card-avatar-mini">
+                  {% if news.website %}
+                      <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Default source">
+                  {% endif %}
+                </div>
+              </div>
+              <div class="card-date-mini">
+                {{ news.date_published|date:"j \d\e F, Y" }}
+              </div>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="glide__arrows" data-glide-el="controls">
+      <button class="glide__arrow glide__arrow--left" data-glide-dir="<">&larr;</button>
+      <button class="glide__arrow glide__arrow--right" data-glide-dir=">">&rarr;</button>
+    </div>
+  </div>
+</div>
+</div>
+{% endif %}
+
+{% if negative_news %}
+<div class="recent-news-grid">
+  <div class="recent-news-grid2">
+    <div class="heading-h-2">Noticias negativas</div>
+    <div class="spacer"></div>
+  </div>
+  <div class="glide" id="glide-negative">
+    <div class="glide__track" data-glide-el="track">
+      <ul class="glide__slides">
+        {% for news in negative_news %}
+        <li class="glide__slide">
+          <div class="item">
+            <div class="image-replace">
+              <a href="{{ news.link }}">
+                {% if news.img_url %}
+                <img src="{{ news.img_url }}" alt="{{ news.title }}" class="image-replace" loading="lazy" />
+                {% else %}
+                <img src="{% static 'img/logo.png' %}" alt="{{ news.title }}" class="image-replace-placeholder" loading="lazy" />
+                {% endif %}
+              </a>
+              <div class="sentiment-tag {{ news.sentiment|lower }}">
+                <div class="button-text">
+                  {{ news.sentiment }}
+                </div>
+              </div>
+            </div>
+            <div class="heading-h-3">
+              <a href="{{ news.link }}">
+                {{ news.title|truncatechars:60 }}
+              </a>
+            </div>
+            <div class="spacer"></div>
+            <div class="top-mini">
+              <div class="card-avatar">
+                <div class="card-avatar-mini">
+                  {% if news.website %}
+                      <img src="{% static 'img/source_logos/' %}{{ news.website }}.png" alt="{{ news.website }}">
+                  {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Default source">
+                  {% endif %}
+                </div>
+              </div>
+              <div class="card-date-mini">
+                {{ news.date_published|date:"j \d\e F, Y" }}
+              </div>
+            </div>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="glide__arrows" data-glide-el="controls">
+      <button class="glide__arrow glide__arrow--left" data-glide-dir="<">&larr;</button>
+      <button class="glide__arrow glide__arrow--right" data-glide-dir=">">&rarr;</button>
+    </div>
+  </div>
+</div>
+</div>
+{% endif %}
 
 {% endblock %}
 {% endblock %}
